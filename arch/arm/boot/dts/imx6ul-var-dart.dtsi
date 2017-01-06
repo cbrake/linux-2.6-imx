@@ -120,11 +120,14 @@
 
 	leds {
 		compatible = "gpio-leds";
+/*
 		hdd {
 			label = "IDE Activity";
 			gpios = <&gpio4 20 0>;
 			linux,default-trigger = "ide-disk";
 		};
+*/
+
 
 		heartbeat {
 			label = "Heart Beat";
@@ -230,8 +233,8 @@
 			native-mode = <&timing0>;
 			timing0: timing0 {
 				clock-frequency =<35000000>;
-				hactive = <800>;
-				vactive = <480>;
+				hactive = <480>;
+				vactive = <272>;
 				hfront-porch = <40>;
 				hback-porch = <40>;
 				hsync-len = <48>;
