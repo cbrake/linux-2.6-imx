@@ -136,6 +136,13 @@
 		};
 */
 	};
+
+
+	okvc {
+		compatible = "okvc-misc";
+		pinctrl-names = "default";
+		pwms = <&pwm8 0 20000>;
+	};
 };
 
 &cpu0 {
@@ -532,14 +539,15 @@
 				MX6UL_PAD_JTAG_MOD__GPIO1_IO10          0x4001b0b0 /* 2_MODE2 */
 				MX6UL_PAD_GPIO1_IO08__GPIO1_IO08        0x4001b0b0 /* GPIO1_8 */
 				MX6UL_PAD_GPIO1_IO05__GPIO1_IO05        0x4001b0b0 /* Sensor_2 */
-				MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07      0x4001b0b0 /* 1_Encoder_2 */
-				MX6UL_PAD_SNVS_TAMPER8__GPIO5_IO08      0x4001b0b0 /* 1_Encoder_1 */
 				MX6UL_PAD_GPIO1_IO09__GPIO1_IO09        0x4001b0b0 /* Output Pressure */
 				MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09      0x4001b0b0 /* 2_nFAULT */
 				MX6UL_PAD_JTAG_TMS__GPIO1_IO11          0x4001b0b0 /* TXS_2 */
 				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18       0x4001b0b0 /* TXS_OE */
 				MX6UL_PAD_GPIO1_IO00__GPIO1_IO00        0x4001b0b0 /* Sensor_1 */
 				MX6UL_PAD_JTAG_TDO__GPIO1_IO12          0x4001b0b0 /* 2_nSLEEP */
+				MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07      0x4001b0b0 /* 1_Encoder_2 */
+				MX6UL_PAD_SNVS_TAMPER8__GPIO5_IO08      0x4001b0b0 /* 1_Encoder_1 */
+
 			>;
 		};
 
