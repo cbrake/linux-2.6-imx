@@ -98,6 +98,8 @@
 #define VF610_ADC_CALF			0x2
 #define VF610_ADC_TIMEOUT		msecs_to_jiffies(100)
 
+struct iio_dev *vf610_adc_dev = NULL;
+
 enum clk_sel {
 	VF610_ADCIOC_BUSCLK_SET,
 	VF610_ADCIOC_ALTCLK_SET,
@@ -474,6 +476,7 @@ static const struct attribute_group vf610_attribute_group = {
 	.attrs = vf610_attributes,
 };
 
+
 static int vf610_read_raw(struct iio_dev *indio_dev,
 			struct iio_chan_spec const *chan,
 			int *val,
@@ -483,6 +486,9 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 	struct vf610_adc *info = iio_priv(indio_dev);
 	unsigned int hc_cfg;
 	long ret;
+
+	printk("CLIFF: chan->channel: %i, chan->type: %i, mask: 0x%i\n", chan->channel, chan->type,
+			mask);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
@@ -541,6 +547,27 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
+int vf610_read_raw_internal(int channel) {
+	struct iio_chan_spec chan;
+	int val;
+	int val2;
+
+
+	if (vf610_adc_dev == NULL) {
+		printk("vf610_adc_dev has not been initialized yet\n");
+		return 0;
+	}
+
+	chan.type = 0;
+	chan.channel = channel;
+
+	vf610_read_raw(vf610_adc_dev, &chan, &val, &val2, 0);
+
+	return val;
+}
+
+EXPORT_SYMBOL(vf610_read_raw_internal);
+
 static int vf610_write_raw(struct iio_dev *indio_dev,
 			struct iio_chan_spec const *chan,
 			int val,
@@ -598,6 +625,7 @@ static const struct of_device_id vf610_adc_match[] = {
 };
 MODULE_DEVICE_TABLE(of, vf610_adc_match);
 
+
 static int vf610_adc_probe(struct platform_device *pdev)
 {
 	struct vf610_adc *info;
@@ -612,6 +640,8 @@ static int vf610_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed allocating iio device\n");
 		return -ENOMEM;
 	}
+
+	vf610_adc_dev = indio_dev;
 
 	info = iio_priv(indio_dev);
 	info->dev = &pdev->dev;
