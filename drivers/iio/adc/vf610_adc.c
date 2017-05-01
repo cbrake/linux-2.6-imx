@@ -487,9 +487,6 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 	unsigned int hc_cfg;
 	long ret;
 
-	printk("CLIFF: chan->channel: %i, chan->type: %i, mask: 0x%i\n", chan->channel, chan->type,
-			mask);
-
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
 	case IIO_CHAN_INFO_PROCESSED:
