@@ -160,10 +160,25 @@ static ssize_t adc_show(struct device *cdev,
 		struct device_attribute *attr, char *buf)
 {
 	return snprintf(buf, 40, "%d\n", vf610_read_raw_internal(8));
-	return snprintf(buf, 40, "%d\n", 100);
 }
 
 static DEVICE_ATTR_RO(adc);
+
+static ssize_t adc_pressure_input_show(struct device *cdev,
+		struct device_attribute *attr, char *buf)
+{
+	int total = 0;
+	int i;
+
+	for (i=0; i<8; i++) {
+		total += vf610_read_raw_internal(1);
+	}
+
+	return snprintf(buf, 40, "%d\n", total/8);
+}
+
+static DEVICE_ATTR_RO(adc_pressure_input);
+
 
 static ssize_t pos_show(struct device *cdev,
 		struct device_attribute *attr, char *buf)
@@ -581,6 +596,7 @@ static DEVICE_ATTR_RW(backward_ms);
 static struct attribute *okvc_attrs[] = {
 	&dev_attr_pos.attr,
 	&dev_attr_adc.attr,
+	&dev_attr_adc_pressure_input.attr,
 	&dev_attr_forward_cnt.attr,
 	&dev_attr_backward_cnt.attr,
 	&dev_attr_pwm.attr,
@@ -852,7 +868,7 @@ static int okvc_init(void)
 {
 	int ret;
 
-	printk("okvc_init, v12\n");
+	printk("okvc_init, v13\n");
 
 	ret = platform_driver_probe(&okvc_platform_driver, okvc_probe);
 	if (ret) {
