@@ -285,7 +285,9 @@ static ssize_t run_motor_store(struct device *cdev,
 		hrtimer_start(&okvc_->timer, ms_to_ktime(okvc_->forward_ms), HRTIMER_MODE_REL);
 		okvc_->state = OKVC_MOTOR_FORWARD;
 	} else if (!run_) {
+		hrtimer_cancel(&okvc_->timer);
 		setup_motor(SETUP_MOTOR_BRAKE);
+		okvc_->state = OKVC_IDLE;
 		printk("Stopping motor\n");
 	}
 
@@ -317,10 +319,11 @@ static ssize_t run_spray_store(struct device *cdev,
 		hrtimer_start(&okvc_->timer, ms_to_ktime(okvc_->spray_pre_ms), HRTIMER_MODE_REL);
 		okvc_->state = OKVC_SPRAY_PRE;
 	} else if (!run_) {
-		printk("Stopping spray\n");
+		hrtimer_cancel(&okvc_->timer);
 		gpio_set_value(TXS1, 0);
 		gpio_set_value(TXS2, 0);
 		okvc_->state = OKVC_IDLE;
+		printk("Stopping spray\n");
 	}
 
 	okvc_->run_spray = run_;
@@ -357,9 +360,10 @@ static ssize_t run_prec_valve_store(struct device *cdev,
 		okvc_->state = OKVC_PREC_VALVE_ADC;
 		okvc_->adc_average = 0;
 	} else if (!run_) {
-		printk("Stopping precision valve\n");
+		hrtimer_cancel(&okvc_->timer);
 		gpio_set_value(TXS1, 0);
 		okvc_->state = OKVC_IDLE;
+		printk("Stopping precision valve\n");
 	}
 
 	okvc_->run_prec_valve = run_;
@@ -843,11 +847,12 @@ static struct platform_driver okvc_platform_driver = {
 	},
 };
 
+
 static int okvc_init(void)
 {
 	int ret;
 
-	printk("okvc_init, v11\n");
+	printk("okvc_init, v12\n");
 
 	ret = platform_driver_probe(&okvc_platform_driver, okvc_probe);
 	if (ret) {
