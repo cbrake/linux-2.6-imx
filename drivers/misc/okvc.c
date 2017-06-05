@@ -31,13 +31,13 @@
 #define ENCODER_1_B 135
 #define ENCODER_2_A 27
 #define ENCODER_2_B 26
-//#define DIR_1 117
-#define IN_A 117
+#define DIR_1 117
+//#define IN_A 117
 #define DIR_2 42
 #define SLEEP_1	113
 #define SLEEP_2	12
-//#define MODE_1_1	119
-#define IN_B 119
+#define MODE_1_1	119
+//#define IN_B 119
 #define MODE_1_2	120
 #define MODE_2_1	46
 #define MODE_2_2	10
@@ -69,29 +69,6 @@ enum okvc_state {
 };
 
 
-enum {
-	SETUP_MOTOR_BRAKE,
-	SETUP_MOTOR_CW,
-	SETUP_MOTOR_CCW,
-};
-
-void setup_motor(int state) 
-{
-	switch (state) {
-	case SETUP_MOTOR_BRAKE:
-		gpio_set_value(IN_A, 1);
-		gpio_set_value(IN_B, 1);
-		break;
-	case SETUP_MOTOR_CW:
-		gpio_set_value(IN_A, 1);
-		gpio_set_value(IN_B, 0);
-		break;
-	case SETUP_MOTOR_CCW:
-		gpio_set_value(IN_A, 0);
-		gpio_set_value(IN_B, 1);
-		break;
-	}
-}
 
 struct okvc {
 	int pos;
@@ -132,11 +109,17 @@ struct okvc {
 	struct work_struct adc_work;
 };
 
+static int pwm_period = 500000;
+
+static int okvc_pwm_high(struct okvc *okvc_)
+{
+	return pwm_config(okvc_->pwm, pwm_period, pwm_period);
+}
+
 static int okvc_pwm_config(struct okvc *okvc_)
 {
 	int ret;
 	int pwm_duty_ns;
-	int pwm_period = 500000;
 
 	pwm_duty_ns = ((okvc_->pwm_duty_percentx10) * pwm_period) / 1000;
 	printk("PWM duty=%dns, period=%dns\n", pwm_duty_ns, pwm_period);
@@ -155,6 +138,34 @@ static int okvc_pwm_config(struct okvc *okvc_)
 	return 0;
 }
 
+enum {
+	SETUP_MOTOR_BRAKE,
+	SETUP_MOTOR_CW,
+	SETUP_MOTOR_CCW,
+};
+
+void setup_motor(struct okvc *okvc_, int state) 
+{
+	switch (state) {
+	case SETUP_MOTOR_BRAKE:
+		okvc_pwm_high(okvc_);
+		gpio_set_value(MODE_1_1, 1);
+		gpio_set_value(DIR_1, 0);
+		break;
+	case SETUP_MOTOR_CW:
+		okvc_pwm_config(okvc_);
+		gpio_set_value(MODE_1_1, 0);
+		gpio_set_value(DIR_1, 0);
+		break;
+	case SETUP_MOTOR_CCW:
+		okvc_pwm_config(okvc_);
+		gpio_set_value(MODE_1_1, 0);
+		gpio_set_value(DIR_1, 1);
+		break;
+	}
+}
+
+
 /* Sysfs Attributes */
 static ssize_t adc_show(struct device *cdev,
 		struct device_attribute *attr, char *buf)
@@ -171,7 +182,7 @@ static ssize_t adc_pressure_input_show(struct device *cdev,
 	int i;
 
 	for (i=0; i<8; i++) {
-		total += vf610_read_raw_internal(1);
+		total += vf610_read_raw_internal(0);
 	}
 
 	return snprintf(buf, 40, "%d\n", total/8);
@@ -262,10 +273,11 @@ static ssize_t run_motor_enc_store(struct device *cdev,
 	} else if (run_ && !okvc_->run_motor_enc) {
 		okvc_->pos = 0;
 		gpio_set_value(TXS1, 1);
-		setup_motor(SETUP_MOTOR_CW);
+		setup_motor(okvc_, SETUP_MOTOR_CW);
 		okvc_->state = OKVC_ENC_FORWARD;
 	} else if (!run_) {
-		setup_motor(SETUP_MOTOR_BRAKE);
+		gpio_set_value(TXS1, 0);
+		setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 		printk("Stopping motor\n");
 		okvc_->state = OKVC_IDLE;
 	}
@@ -296,12 +308,13 @@ static ssize_t run_motor_store(struct device *cdev,
 	} else if (run_ && !okvc_->run_motor) {
 		okvc_->pos = 0;
 		gpio_set_value(TXS1, 1);
-		setup_motor(SETUP_MOTOR_CW);
+		setup_motor(okvc_, SETUP_MOTOR_CW);
 		hrtimer_start(&okvc_->timer, ms_to_ktime(okvc_->forward_ms), HRTIMER_MODE_REL);
 		okvc_->state = OKVC_MOTOR_FORWARD;
 	} else if (!run_) {
 		hrtimer_cancel(&okvc_->timer);
-		setup_motor(SETUP_MOTOR_BRAKE);
+		gpio_set_value(TXS1, 0);
+		setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 		okvc_->state = OKVC_IDLE;
 		printk("Stopping motor\n");
 	}
@@ -423,9 +436,9 @@ static ssize_t forward_store(struct device *cdev,
 		return count;
 	} else if (forward) {
 		gpio_set_value(TXS1, 1);
-		setup_motor(SETUP_MOTOR_CW);
+		setup_motor(okvc_, SETUP_MOTOR_CW);
 	} else {
-		setup_motor(SETUP_MOTOR_BRAKE);
+		setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 	}
 
 	okvc_->forward = forward;
@@ -451,9 +464,9 @@ static ssize_t backward_store(struct device *cdev,
 		printk("Driver already running\n");
 		return count;
 	} else if (backward) {
-		setup_motor(SETUP_MOTOR_CCW);
+		setup_motor(okvc_, SETUP_MOTOR_CCW);
 	} else {
-		setup_motor(SETUP_MOTOR_BRAKE);
+		setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 	}
 
 	okvc_->backward = backward;
@@ -627,8 +640,8 @@ static struct gpio okvc_gpios[] = {
 	{ ENCODER_1_B, GPIOF_IN, "ENCODER_1_B"},
 	{ MODE_1_2, GPIOF_OUT_INIT_HIGH, "MODE_1_2"},
 	{ SLEEP_1, GPIOF_OUT_INIT_HIGH, "SLEEP_1"},
-	{ IN_A, GPIOF_OUT_INIT_HIGH, "IN_A"},
-	{ IN_B, GPIOF_OUT_INIT_HIGH, "IN_B"},
+	{ DIR_1, GPIOF_OUT_INIT_LOW, "DIR_1"},
+	{ MODE_1_1, GPIOF_OUT_INIT_HIGH, "MODE_1_1"},
 	{ TXS_OE, GPIOF_OUT_INIT_HIGH, "TXS_OE"},
 	{ TXS1, GPIOF_OUT_INIT_LOW, "TXS1"},
 	{ TXS2, GPIOF_OUT_INIT_LOW, "TXS2"},
@@ -638,23 +651,28 @@ static irqreturn_t okvc_irq(int irq, void *dev_id)
 {
 	int ret;
 	struct okvc *okvc_ = dev_id;
-	
-	int b = !!gpio_get_value(ENCODER_1_B);
 
+	okvc_->pos++;
+	
+	/*
+	int b = !!gpio_get_value(ENCODER_1_B);
+	
 	if (b ^ okvc_->reverse_encoder) {
 		okvc_->pos--;
 	} else {
 		okvc_->pos++;
 	}
+	*/
 
 	switch (okvc_->state) {
 	case OKVC_ENC_FORWARD:
 		// running forward
 		if (okvc_->pos > okvc_->forward_cnt) {
-			setup_motor(SETUP_MOTOR_BRAKE);
+			setup_motor(okvc_, SETUP_MOTOR_BRAKE);
+			gpio_set_value(TXS1, 0);
 			printk("pos = %d, changing directions\n", okvc_->pos);
 			okvc_->pos = 0;
-			setup_motor(SETUP_MOTOR_CCW);
+			setup_motor(okvc_, SETUP_MOTOR_CCW);
 			okvc_->state = OKVC_ENC_BACKWARD;
 			ret = pwm_enable(okvc_->pwm);
 			if (ret) {
@@ -665,8 +683,8 @@ static irqreturn_t okvc_irq(int irq, void *dev_id)
 		break;
 	case OKVC_ENC_BACKWARD:
 		// running backward
-		if (okvc_->pos < -(okvc_->backward_cnt)) {
-			setup_motor(SETUP_MOTOR_BRAKE);
+		if (okvc_->pos > (okvc_->backward_cnt)) {
+			setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 			okvc_->state = OKVC_IDLE;
 			printk("pos = %d, cycle complete\n", okvc_->pos);
 			okvc_->run_motor_enc = 0;
@@ -700,13 +718,14 @@ static enum hrtimer_restart okvc_timer_callback(struct hrtimer *timer)
 
 	switch (okvc_->state) {
 	case OKVC_MOTOR_FORWARD:
-		setup_motor(SETUP_MOTOR_CCW);
+		setup_motor(okvc_, SETUP_MOTOR_CCW);
+		gpio_set_value(TXS1, 0);
 		hrtimer_forward_now(&okvc_->timer, ms_to_ktime(okvc_->backward_ms));
 		ret = HRTIMER_RESTART;
 		okvc_->state = OKVC_MOTOR_BACKWARD;
 		break;
 	case OKVC_MOTOR_BACKWARD:
-		setup_motor(SETUP_MOTOR_BRAKE);
+		setup_motor(okvc_, SETUP_MOTOR_BRAKE);
 		okvc_->run_motor = 0;
 		okvc_->state = OKVC_IDLE;
 		break;
@@ -817,8 +836,8 @@ static int __init okvc_probe(struct platform_device *pdev)
 	gpio_export(ENCODER_1_B, 0);
 	gpio_export(ENCODER_2_A, 0);
 	gpio_export(ENCODER_2_B, 0);
-	gpio_export(IN_A, 0);
-	gpio_export(IN_B, 0);
+	gpio_export(DIR_1, 0);
+	gpio_export(MODE_1_1, 0);
 	gpio_export(MODE_1_2, 0);
 
 	hrtimer_init(&okvc_->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -868,7 +887,7 @@ static int okvc_init(void)
 {
 	int ret;
 
-	printk("okvc_init, v13\n");
+	printk("okvc_init, v20\n");
 
 	ret = platform_driver_probe(&okvc_platform_driver, okvc_probe);
 	if (ret) {
