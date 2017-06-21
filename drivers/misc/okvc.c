@@ -109,7 +109,8 @@ struct okvc
 	struct work_struct adc_work;
 };
 
-static int pwm_period = 500000;
+// 10KHz PMW
+static int pwm_period = 100000;
 
 static int okvc_pwm_high(struct okvc *okvc_)
 {
@@ -925,7 +926,7 @@ static int okvc_init(void)
 {
 	int ret;
 
-	printk("okvc_init, v21\n");
+	printk("okvc_init, v22\n");
 
 	ret = platform_driver_probe(&okvc_platform_driver, okvc_probe);
 	if (ret)
